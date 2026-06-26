@@ -45,8 +45,8 @@ analysis history just won't be saved. To run Mongo locally with Docker:
 ```bash
 docker run -d -p 27017:27017 --name mongo mongo
 ```
-
-### 2. Frontend
+### deployment link:
+### 2. Frontendhttps://ai-resume-interview-assistant-seven.vercel.app/admin
 
 ```bash
 cd frontend
