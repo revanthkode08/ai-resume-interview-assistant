@@ -16,8 +16,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 from skill_extractor import extract_skills, compute_skill_gap
 
-SEMANTIC_WEIGHT = 0.6
-KEYWORD_WEIGHT = 0.4
+SEMANTIC_WEIGHT = 0.50
+KEYWORD_WEIGHT = 0.30
+QUALIFICATION_WEIGHT = 0.10
+REWARDS_WEIGHT = 0.05
+PARTICIPATION_WEIGHT = 0.05
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MODEL_NAME = "llama-3.3-70b-versatile"
@@ -93,6 +96,46 @@ def semantic_similarity(resume_text: str, jd_text: str) -> float:
         return lexical_similarity_fallback(resume_text, jd_text)
 
 
+def evaluate_profile_factors(resume_text: str) -> dict:
+    text_lower = resume_text.lower()
+
+    # 1. Qualifications (Degrees and Certifications)
+    qual_keywords = [
+        "bachelor", "master", "phd", "degree", "graduate", "b.tech", "m.tech", "btech", "mtech",
+        "b.s.", "m.s.", "bsc", "msc", "mba", "certification", "certified", "diploma"
+    ]
+    qual_score = 0.0
+    matched_quals = [k for k in qual_keywords if k in text_lower]
+    if matched_quals:
+        qual_score = min(100.0, 40.0 + len(matched_quals) * 15.0)
+
+    # 2. Rewards (Achievements and Honors)
+    reward_keywords = [
+        "award", "reward", "honor", "scholarship", "winner", "achievement", "first place",
+        "gold medal", "recognition", "outstanding", "dean's list", "prize"
+    ]
+    reward_score = 0.0
+    matched_rewards = [k for k in reward_keywords if k in text_lower]
+    if matched_rewards:
+        reward_score = min(100.0, 40.0 + len(matched_rewards) * 15.0)
+
+    # 3. Participation (Extracurriculars, hackathons, volunteering, leadership)
+    part_keywords = [
+        "volunteer", "hackathon", "participant", "participated", "member", "club", "society",
+        "organized", "lead", "leadership", "speaker", "committee", "extracurricular"
+    ]
+    part_score = 0.0
+    matched_parts = [k for k in part_keywords if k in text_lower]
+    if matched_parts:
+        part_score = min(100.0, 40.0 + len(matched_parts) * 15.0)
+
+    return {
+        "qualification_score": round(qual_score, 1),
+        "rewards_score": round(reward_score, 1),
+        "participation_score": round(part_score, 1),
+    }
+
+
 def analyze_resume_against_jd(resume_text: str, jd_text: str) -> dict:
     resume_skills = extract_skills(resume_text)
     jd_skills = extract_skills(jd_text)
@@ -101,14 +144,28 @@ def analyze_resume_against_jd(resume_text: str, jd_text: str) -> dict:
     semantic_score = semantic_similarity(resume_text, jd_text)
     keyword_score = gap["skill_match_percent"]
 
+    # Profile completeness factors (qualification, rewards, participation)
+    profile_factors = evaluate_profile_factors(resume_text)
+    q_score = profile_factors["qualification_score"]
+    r_score = profile_factors["rewards_score"]
+    p_score = profile_factors["participation_score"]
+
     ats_score = round(
-        (semantic_score * SEMANTIC_WEIGHT) + (keyword_score * KEYWORD_WEIGHT), 1
+        (semantic_score * SEMANTIC_WEIGHT) +
+        (keyword_score * KEYWORD_WEIGHT) +
+        (q_score * QUALIFICATION_WEIGHT) +
+        (r_score * REWARDS_WEIGHT) +
+        (p_score * PARTICIPATION_WEIGHT),
+        1
     )
 
     return {
         "ats_score": ats_score,
         "semantic_similarity_score": semantic_score,
         "keyword_match_score": keyword_score,
+        "qualification_score": q_score,
+        "rewards_score": r_score,
+        "participation_score": p_score,
         "resume_skills": resume_skills,
         "jd_skills": jd_skills,
         **gap,

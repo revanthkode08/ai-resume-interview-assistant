@@ -373,7 +373,9 @@ export default function Dashboard() {
                     <div className="score-bars">
                       <ScoreBar label="Semantic Similarity" value={analysis.semantic_similarity_score} />
                       <ScoreBar label="Keyword Match"       value={analysis.keyword_match_score} />
-                      <ScoreBar label="Skill Match %"       value={analysis.skill_match_percent} />
+                      <ScoreBar label="Qualifications"      value={analysis.qualification_score || 0} />
+                      <ScoreBar label="Rewards & Honors"    value={analysis.rewards_score || 0} />
+                      <ScoreBar label="Participation"       value={analysis.participation_score || 0} />
                     </div>
                   </div>
 
