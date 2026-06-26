@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://YOUR_BACKEND_RENDER_URL/api/:path*"
+      "destination": "https://ai-resume-interview-assistant-3cf8.onrender.com/api/:path*"
     }
   ]
 }
