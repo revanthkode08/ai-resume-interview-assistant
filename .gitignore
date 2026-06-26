@@ -1,0 +1,22 @@
+# Node / Frontend
+node_modules/
+dist/
+.eslintcache
+*.log
+
+# Python / Backend
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.pytest_cache/
+test.txt
+
+# IDEs / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
