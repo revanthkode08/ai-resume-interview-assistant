@@ -9,7 +9,7 @@ matching alone misses synonyms/paraphrased experience, so we combine both."
 """
 from functools import lru_cache
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from skill_extractor import extract_skills, compute_skill_gap
 
@@ -17,17 +17,21 @@ SEMANTIC_WEIGHT = 0.6
 KEYWORD_WEIGHT = 0.4
 
 
-@lru_cache(maxsize=1)
-def get_model():
-    # Loaded once and cached — small, fast model good enough for this use case.
-    return SentenceTransformer("all-MiniLM-L6-v2")
-
-
 def semantic_similarity(resume_text: str, jd_text: str) -> float:
-    model = get_model()
-    embeddings = model.encode([resume_text, jd_text])
-    sim = float(cosine_similarity([embeddings[0]], [embeddings[1]])[0][0])
-    # cosine similarity is -1..1, clamp and scale to 0..100
+    # Handle empty text defensive checks
+    if not resume_text.strip() or not jd_text.strip():
+        return 0.0
+
+    # TF-IDF Vectorizer with stop words removal
+    vectorizer = TfidfVectorizer(stop_words='english')
+    try:
+        tfidf = vectorizer.fit_transform([resume_text, jd_text])
+        # Cosine similarity between resume (index 0) and jd (index 1)
+        sim = float(cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0])
+    except Exception:
+        return 0.0
+
+    # Scale similarity to 0..100
     sim = max(0.0, min(1.0, sim))
     return round(sim * 100, 1)
 
