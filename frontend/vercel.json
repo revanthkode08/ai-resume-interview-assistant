@@ -4,6 +4,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://ai-resume-interview-assistant-3cf8.onrender.com/api/:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ]
 }
