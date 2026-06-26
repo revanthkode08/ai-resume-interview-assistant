@@ -16,8 +16,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 from skill_extractor import extract_skills, compute_skill_gap
 
-SEMANTIC_WEIGHT = 0.50
-KEYWORD_WEIGHT = 0.30
+SEMANTIC_WEIGHT = 0.80
 QUALIFICATION_WEIGHT = 0.10
 REWARDS_WEIGHT = 0.05
 PARTICIPATION_WEIGHT = 0.05
@@ -152,7 +151,6 @@ def analyze_resume_against_jd(resume_text: str, jd_text: str) -> dict:
 
     ats_score = round(
         (semantic_score * SEMANTIC_WEIGHT) +
-        (keyword_score * KEYWORD_WEIGHT) +
         (q_score * QUALIFICATION_WEIGHT) +
         (r_score * REWARDS_WEIGHT) +
         (p_score * PARTICIPATION_WEIGHT),

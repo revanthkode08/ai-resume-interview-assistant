@@ -372,7 +372,6 @@ export default function Dashboard() {
                     <ScoreRing score={analysis.ats_score} label="ATS Score" size={120} />
                     <div className="score-bars">
                       <ScoreBar label="Semantic Similarity" value={analysis.semantic_similarity_score} />
-                      <ScoreBar label="Keyword Match"       value={analysis.keyword_match_score} />
                       <ScoreBar label="Qualifications"      value={analysis.qualification_score || 0} />
                       <ScoreBar label="Rewards & Honors"    value={analysis.rewards_score || 0} />
                       <ScoreBar label="Participation"       value={analysis.participation_score || 0} />
