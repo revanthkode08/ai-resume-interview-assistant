@@ -1024,6 +1024,10 @@ textarea.form-input { resize: vertical; min-height: 120px; line-height: 1.5; }
   0%, 100% { box-shadow: 0 0 20px rgba(99,102,241,0.2); }
   50%       { box-shadow: 0 0 40px rgba(99,102,241,0.5); }
 }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
 
 .animate-fadeIn { animation: fadeIn 0.4s ease; }
 .animate-fadeInUp { animation: fadeInUp 0.4s ease; }

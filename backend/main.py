@@ -17,6 +17,10 @@ from auth import (
     create_access_token, decode_token,
     get_current_user, bearer_scheme,
 )
+from skill_extractor import extract_skills
+from jobs_engine import seed_default_jobs, get_recommended_jobs
+from voice_bot import start_mock_interview, respond_mock_interview
+import leetcode_tracker
 
 app = FastAPI(title="AI Resume & Interview Assistant API")
 
@@ -69,6 +73,12 @@ def seed_admin():
         print(f"[AUTH] Admin already exists: {admin_email}")
 
 seed_admin()
+
+if MONGO_AVAILABLE:
+    try:
+        seed_default_jobs(db)
+    except Exception as e:
+        print(f"[STARTUP] Seeding default jobs failed: {e}")
 
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
@@ -172,6 +182,23 @@ async def parse_resume(
             status_code=400,
             detail="Could not extract any text. The file may be a scanned image — try a text-based PDF.",
         )
+        
+    # Save the parsed text and extracted skills to the user profile
+    if MONGO_AVAILABLE:
+        try:
+            skills = extract_skills(text)
+            users_col.update_one(
+                {"_id": user["_id"]},
+                {"$set": {
+                    "resume_text": text,
+                    "skills": skills,
+                    "resume_filename": file.filename,
+                    "updated_at": datetime.now(timezone.utc)
+                }}
+            )
+        except Exception as e:
+            print(f"[PARSE RESUME] Failed to save skills to user profile: {e}")
+            
     return {"filename": file.filename, "resume_text": text}
 
 
@@ -187,6 +214,20 @@ async def analyze(
     result = analyze_resume_against_jd(resume_text, jd_text)
 
     if MONGO_AVAILABLE:
+        # Save latest analyze text and extracted skills to user profile
+        try:
+            skills = extract_skills(resume_text)
+            users_col.update_one(
+                {"_id": user["_id"]},
+                {"$set": {
+                    "resume_text": resume_text,
+                    "skills": skills,
+                    "updated_at": datetime.now(timezone.utc)
+                }}
+            )
+        except Exception as e:
+            print(f"[ANALYZE] Failed to save skills to user profile: {e}")
+
         history_col.insert_one({
             "user_id": user["_id"],
             "type": "analysis",
@@ -313,3 +354,149 @@ def admin_recent_activity(admin=Depends(require_admin), limit: int = 20):
             "user_email": user.get("email") if user else "Unknown",
         })
     return {"activity": result}
+
+
+# ── Jobs Recommendations Routes ───────────────────────────────────────────────
+
+@app.get("/api/jobs/recommendations")
+def recommendations(user=Depends(require_user)):
+    if not MONGO_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database not available.")
+    return get_recommended_jobs(db, user)
+
+
+# ── Voice Bot Routes ──────────────────────────────────────────────────────────
+
+@app.post("/api/voice-bot/start")
+def start_interview(
+    role: str = Form(...),
+    category: str = Form(...),
+    num_questions: int = Form(3),
+    user=Depends(require_user)
+):
+    try:
+        return start_mock_interview(db, user, role, category, num_questions)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/voice-bot/respond")
+def respond_interview(
+    session_id: str = Form(...),
+    user_answer: str = Form(...),
+    user=Depends(require_user)
+):
+    try:
+        return respond_mock_interview(db, session_id, user_answer)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/voice-bot/history")
+def get_voice_history(user=Depends(require_user)):
+    if not MONGO_AVAILABLE:
+        return {"history": []}
+    
+    mock_interviews = db["mock_interviews"]
+    records = list(
+        mock_interviews.find(
+            {"user_id": user["_id"], "status": "completed"}, 
+            {"_id": 1, "role": 1, "category": 1, "feedback.score": 1, "completed_at": 1}
+        ).sort("completed_at", -1)
+    )
+    
+    result = []
+    for r in records:
+        result.append({
+            "session_id": str(r["_id"]),
+            "role": r.get("role"),
+            "category": r.get("category"),
+            "score": r.get("feedback", {}).get("score", 0) if r.get("feedback") else 0,
+            "completed_at": r["completed_at"].isoformat() if isinstance(r.get("completed_at"), datetime) else None
+        })
+    return {"history": result}
+
+
+@app.get("/api/voice-bot/session/{session_id}")
+def get_voice_session(session_id: str, user=Depends(require_user)):
+    if not MONGO_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database not available.")
+    
+    mock_interviews = db["mock_interviews"]
+    session = mock_interviews.find_one({"_id": ObjectId(session_id), "user_id": user["_id"]})
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found.")
+    
+    # Serialize ObjectId
+    session["_id"] = str(session["_id"])
+    session["user_id"] = str(session["user_id"])
+    if isinstance(session.get("created_at"), datetime):
+        session["created_at"] = session["created_at"].isoformat()
+    if isinstance(session.get("completed_at"), datetime):
+        session["completed_at"] = session["completed_at"].isoformat()
+        
+    return session
+
+
+# ── LeetCode Tracker Routes ───────────────────────────────────────────────────
+
+@app.post("/api/leetcode/log")
+def log_leetcode(
+    problem_title: str = Form(...),
+    problem_url: str = Form(""),
+    difficulty: str = Form("Easy"),
+    topic: str = Form("General"),
+    notes: str = Form(""),
+    solution_code: str = Form(""),
+    user=Depends(require_user)
+):
+    data = {
+        "problem_title": problem_title,
+        "problem_url": problem_url,
+        "difficulty": difficulty,
+        "topic": topic,
+        "notes": notes,
+        "solution_code": solution_code
+    }
+    try:
+        return leetcode_tracker.log_leetcode_problem(db, user["_id"], data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/leetcode/logs")
+def get_leetcode_history(user=Depends(require_user)):
+    return leetcode_tracker.get_leetcode_logs(db, user["_id"])
+
+
+@app.delete("/api/leetcode/log/{log_id}")
+def delete_leetcode(log_id: str, user=Depends(require_user)):
+    try:
+        success = leetcode_tracker.delete_leetcode_log(db, user["_id"], log_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Log not found or unauthorized.")
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/leetcode/stats")
+def get_leetcode_aggregates(user=Depends(require_user)):
+    return leetcode_tracker.get_leetcode_stats(db, user["_id"])
+
+
+@app.get("/api/leetcode/external/{username}")
+def sync_leetcode_external(username: str, user=Depends(require_user)):
+    res = leetcode_tracker.fetch_external_leetcode_stats(username)
+    if res.get("status") == "success":
+        # Save username to user profile
+        if MONGO_AVAILABLE:
+            users_col.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"leetcode_username": username}}
+            )
+    return res

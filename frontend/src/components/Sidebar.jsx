@@ -2,8 +2,11 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const USER_NAV = [
-  { to: '/dashboard', icon: '🏠', label: 'Dashboard' },
-  { to: '/dashboard/history', icon: '📋', label: 'History' },
+  { to: '/dashboard', icon: '🎯', label: 'Resume Analyzer' },
+  { to: '/dashboard/history', icon: '📋', label: 'Analysis History' },
+  { to: '/dashboard/interview', icon: '🎙️', label: 'Mock Interview' },
+  { to: '/dashboard/jobs', icon: '💼', label: 'Job Recommendations' },
+  { to: '/dashboard/leetcode', icon: '📊', label: 'LeetCode Tracker' },
 ]
 
 const ADMIN_NAV = [

@@ -4,6 +4,9 @@ import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
+import MockInterview from './pages/MockInterview'
+import JobsRecommendation from './pages/JobsRecommendation'
+import LeetCodeTracker from './pages/LeetCodeTracker'
 
 export default function App() {
   return (
@@ -13,9 +16,29 @@ export default function App() {
       <Route path="/auth" element={<AuthPage />} />
 
       {/* Protected — any logged-in user */}
-      <Route path="/dashboard/*" element={
+      <Route path="/dashboard" element={
         <ProtectedRoute>
           <Dashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/dashboard/history" element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/dashboard/interview" element={
+        <ProtectedRoute>
+          <MockInterview />
+        </ProtectedRoute>
+      } />
+      <Route path="/dashboard/jobs" element={
+        <ProtectedRoute>
+          <JobsRecommendation />
+        </ProtectedRoute>
+      } />
+      <Route path="/dashboard/leetcode" element={
+        <ProtectedRoute>
+          <LeetCodeTracker />
         </ProtectedRoute>
       } />
 
