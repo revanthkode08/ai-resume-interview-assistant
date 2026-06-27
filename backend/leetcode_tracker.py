@@ -104,29 +104,68 @@ def get_leetcode_stats(db, user_id):
 
 def fetch_external_leetcode_stats(username):
     """Fetch statistics from LeetCode public unofficial API."""
-    url = f"{LEETCODE_STATS_API}{username}"
+    # We will try the new Render API which is much more reliable and currently active
+    url = f"https://alfa-leetcode-api.onrender.com/userProfile/{username}"
     try:
         req = urllib.request.Request(
             url, 
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         )
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=8) as response:
             if response.status == 200:
                 data = json.loads(response.read().decode())
-                if data.get("status") == "success":
-                    return {
-                        "status": "success",
-                        "total_solved": data.get("totalSolved", 0),
-                        "easy_solved": data.get("easySolved", 0),
-                        "medium_solved": data.get("mediumSolved", 0),
-                        "hard_solved": data.get("hardSolved", 0),
-                        "acceptance_rate": data.get("acceptanceRate", 0),
-                        "ranking": data.get("ranking", 0),
-                        "contribution_points": data.get("contributionPoints", 0),
-                        "reputation": data.get("reputation", 0)
-                    }
-                else:
-                    return {"status": "error", "message": data.get("message", "User not found.")}
+                
+                # If user does not exist, alfa-leetcode-api returns errors or empty response
+                if not data or "errors" in data or "error" in data:
+                    error_msg = data.get("errors", [{}])[0].get("message") if "errors" in data else data.get("error", "User not found.")
+                    return {"status": "error", "message": error_msg}
+
+                # Compute acceptance rate
+                ac_all = next((x for x in data.get("matchedUserStats", {}).get("acSubmissionNum", []) if x.get("difficulty") == "All"), None)
+                total_submissions = data.get("totalSubmissions", [])
+                total_all = next((x for x in total_submissions if x.get("difficulty") == "All"), None)
+                
+                acceptance_rate = 0.0
+                if ac_all and total_all and total_all.get("submissions", 0) > 0:
+                    acceptance_rate = round((ac_all.get("submissions", 0) / total_all.get("submissions", 0)) * 100, 2)
+
+                return {
+                    "status": "success",
+                    "total_solved": data.get("totalSolved", 0),
+                    "easy_solved": data.get("easySolved", 0),
+                    "medium_solved": data.get("mediumSolved", 0),
+                    "hard_solved": data.get("hardSolved", 0),
+                    "acceptance_rate": acceptance_rate,
+                    "ranking": data.get("ranking", 0),
+                    "contribution_points": data.get("contributionPoint", 0),
+                    "reputation": data.get("reputation", 0)
+                }
     except Exception as e:
-        print(f"[LEETCODE] Failed to fetch external stats: {e}")
+        print(f"[LEETCODE] New API failed: {e}. Trying fallback...")
+        
+        # Fallback to the original Heroku API
+        fallback_url = f"https://leetcode-stats-api.herokuapp.com/{username}"
+        try:
+            req = urllib.request.Request(
+                fallback_url, 
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    if data.get("status") == "success":
+                        return {
+                            "status": "success",
+                            "total_solved": data.get("totalSolved", 0),
+                            "easy_solved": data.get("easySolved", 0),
+                            "medium_solved": data.get("mediumSolved", 0),
+                            "hard_solved": data.get("hardSolved", 0),
+                            "acceptance_rate": data.get("acceptanceRate", 0),
+                            "ranking": data.get("ranking", 0),
+                            "contribution_points": data.get("contributionPoints", 0),
+                            "reputation": data.get("reputation", 0)
+                        }
+        except Exception as fallback_e:
+            print(f"[LEETCODE] Fallback API also failed: {fallback_e}")
+            
         return {"status": "error", "message": f"Could not connect to LeetCode API. Detail: {str(e)}"}
